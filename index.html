@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR Code System</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            background: url('your-background.JPG')no-repeat center/cover;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+
+        h1, h2 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .tabs {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .tab-btn {
+            padding: 10px 20px;
+            border: none;
+            background: #f0f0f0;
+            cursor: pointer;
+            border-radius: 5px;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+
+        .tab-btn.active {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .tab-content {
+            display: none;
+            padding: 20px;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        input[type="text"] {
+            padding: 10px;
+            width: 80%;
+            max-width: 400px;
+            margin-right: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+
+        button {
+            padding: 10px 20px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        button:hover {
+            background: #45a049;
+        }
+
+        #qr-output {
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        #video-container {
+            width: 100%;
+            max-width: 500px;
+            margin: 0 auto;
+            position: relative;
+        }
+
+        #qr-video {
+            width: 100%;
+            border-radius: 10px;
+        }
+
+        #scan-result {
+            margin-top: 20px;
+            padding: 10px;
+            background: #f9f9f9;
+            border-radius: 5px;
+        }
+
+        .scan-history {
+            margin-top: 20px;
+        }
+
+        .scan-item {
+            padding: 10px;
+            background: #f9f9f9;
+            margin-bottom: 10px;
+            border-radius: 5px;
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+
+</head>
+<body>
+    <div class="container">
+        <h1><i class="fas fa-qrcode"></i> QR Code System</h1>
+        
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="generate">Generate QR</button>
+            <button class="tab-btn" data-tab="scan">Scan QR</button>
+            <button class="tab-btn" data-tab="history">History</button>
+        </div>
+
+        <!-- Generate Tab -->
+        <div id="generate" class="tab-content active">
+            <div class="input-group">
+                <input type="text" id="qr-text" placeholder="Enter text or URL">
+                <button onclick="generateQR()">Generate</button>
+            </div>
+            <div id="qr-output"></div>
+            <a id="download-link" class="hidden">
+                <button>Download QR Code</button>
+            </a>
+        </div>
+
+        <!-- Scan Tab -->
+        <div id="scan" class="tab-content">
+            <div id="video-container">
+                <video id="qr-video" playsinline></video>
+            </div>
+            <div class="input-group">
+                <button onclick="toggleCamera()">Switch Camera</button>
+            </div>
+            <div id="scan-result">
+                Scanning for QR code...
+            </div>
+        </div>
+
+        <!-- History Tab -->
+        <div id="history" class="tab-content">
+            <div id="scan-history" class="scan-history">
+                No scans yet
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function scanQRCode() {
+            if (!scanning) return;
+
+            const video = document.getElementById('qr-video');
+            if (!video || !video.videoWidth) {
+                requestAnimationFrame(scanQRCode);
+                return;
+            }
+
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+
+            try {
+                context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+
+                const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                    inversionAttempts: "dontInvert",
+                });
+
+                if (code) {
+                    console.log("QR Code detected:", code.data);
+                    document.getElementById('scan-result').innerText = `Scanned: ${code.data}`;
+                    saveToHistory('Scanned', code.data);
+                } else {
+                    document.getElementById('scan-result').innerText = 'Scanning for QR code...';
+                }
+            } catch (error) {
+                console.error('Scanning error:', error);
+                document.getElementById('scan-result').innerText = 'Error while scanning';
+            }
+
+            if (scanning) {
+                requestAnimationFrame(scanQRCode);
+            }
+        }
+
+       
+       // Tab switching
+        document.querySelectorAll('.tab-btn').forEach(button => {
+            button.addEventListener('click', () => {
+                // Update buttons
+                document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+                button.classList.add('active');
+
+                // Update content
+                document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+                document.getElementById(button.dataset.tab).classList.add('active');
+
+                // Handle camera
+                if (button.dataset.tab === 'scan') {
+                    startCamera();
+                } else {
+                    stopCamera();
+                }
+            });
+        });
+
+        // QR Generator
+        function generateQR() {
+            const text = document.getElementById('qr-text').value;
+            if (!text) {
+                alert('Please enter some text');
+                return;
+            }
+
+            const outputDiv = document.getElementById('qr-output');
+            outputDiv.innerHTML = '';
+            
+            new QRCode(outputDiv, {
+                text: text,
+                width: 256,
+                height: 256
+            });
+
+            // Enable download
+            setTimeout(() => {
+                const qrImage = outputDiv.querySelector('img');
+                const downloadLink = document.getElementById('download-link');
+                downloadLink.href = qrImage.src;
+                downloadLink.download = 'qrcode.png';
+                downloadLink.classList.remove('hidden');
+            }, 100);
+
+            // Save to history
+            saveToHistory('Generated', text);
+        }
+
+        // QR Scanner
+        let videoStream;
+        let scanning = false;
+        let currentCamera = 'environment';
+
+        async function startCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: currentCamera }
+                });
+                
+                const video = document.getElementById('qr-video');
+                video.srcObject = stream;
+                videoStream = stream;
+                video.play();
+                
+                scanning = true;
+                scanQRCode();
+            } catch (err) {
+                console.error('Error accessing camera:', err);
+                document.getElementById('scan-result').innerText = 'Error accessing camera';
+            }
+        }
+
+        function stopCamera() {
+            if (videoStream) {
+                videoStream.getTracks().forEach(track => track.stop());
+                scanning = false;
+            }
+        }
+
+        async function toggleCamera() {
+            currentCamera = currentCamera === 'environment' ? 'user' : 'environment';
+            stopCamera();
+            await startCamera();
+        }
+
+        function scanQRCode() {
+            if (!scanning) return;
+
+            const video = document.getElementById('qr-video');
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+
+            const code = jsQR(imageData.data, imageData.width, imageData.height);
+
+            if (code) {
+                document.getElementById('scan-result').innerText = `Scanned: ${code.data}`;
+                saveToHistory('Scanned', code.data);
+            }
+
+            if (scanning) {
+                requestAnimationFrame(scanQRCode);
+            }
+        }
+
+        // History Management
+        function saveToHistory(type, data) {
+            const history = JSON.parse(localStorage.getItem('qrHistory') || '[]');
+            history.unshift({
+                type,
+                data,
+                timestamp: new Date().toLocaleString()
+            });
+            localStorage.setItem('qrHistory', JSON.stringify(history));
+            updateHistoryDisplay();
+        }
+
+        function updateHistoryDisplay() {
+            const history = JSON.parse(localStorage.getItem('qrHistory') || '[]');
+            const historyDiv = document.getElementById('scan-history');
+            
+            if (history.length === 0) {
+                historyDiv.innerHTML = 'No scans yet';
+                return;
+            }
+
+            historyDiv.innerHTML = history.map(item => `
+                <div class="scan-item">
+                    <strong>${item.type}:</strong> ${item.data}
+                    <br>
+                    <small>${item.timestamp}</small>
+                </div>
+            `).join('');
+        }
+
+        // Initialize history display
+        updateHistoryDisplay();
+        async function startCamera() {
+            try {
+                const constraints = {
+                    video: { 
+                        facingMode: currentCamera,
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    }
+                };
+
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                const video = document.getElementById('qr-video');
+                
+                video.srcObject = stream;
+                videoStream = stream;
+                
+                video.onloadedmetadata = () => {
+                    video.play();
+                    scanning = true;
+                    scanQRCode();
+                };
+
+                video.onerror = (error) => {
+                    console.error('Video error:', error);
+                    document.getElementById('scan-result').innerText = 'Error starting video';
+                };
+
+            } catch (error) {
+                console.error('Camera access error:', error);
+                document.getElementById('scan-result').innerText = 
+                    `Error accessing camera: ${error.message}. Please ensure camera permissions are granted.`;
+            }
+        }
+    </script>
+</body>
+</html>
